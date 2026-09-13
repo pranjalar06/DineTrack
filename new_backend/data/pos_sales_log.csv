@@ -1,0 +1,7 @@
+OrderId,Timestamp,Item,Size,Quantity,Unit_Price,Line_Total
+981f7fe9d8,2026-09-02T11:10:58,Cheese Pasta,Large,3.0,100.0,300.0
+53a7df93ff,2026-09-02T11:15:49,Cheese Pasta,Large,2.0,100.0,200.0
+08e969e403,2026-09-02T13:35:10,Capsicum Cheese,Large,1.0,100.0,100.0
+1a482311dd,2026-09-02T14:02:13,Chilli Potato,Half,1.0,30.0,30.0
+1a482311dd,2026-09-02T14:02:13,Corn Cheese,Large,1.0,100.0,100.0
+39ee0de64d,2026-09-13T23:33:51,Chilli Potato,Medium,2.0,40.0,80.0

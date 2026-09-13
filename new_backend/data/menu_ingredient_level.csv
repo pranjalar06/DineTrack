@@ -1,0 +1,211 @@
+item,ingredient,grams_per_serving,Unit,ShelfLifeDays,Storage
+Chilli Potato with Pasta,Potato,100,g,7,Refrigerated
+Chilli Potato with Pasta,Pasta,70,g,365,"Airtight, dry"
+Chilli Potato with Pasta,Corn flour,10,g,365,"Airtight, dry"
+Chilli Potato with Pasta,Chilli sauce,15,g,180,Refrigerated after opening
+Chilli Potato with Pasta,Onion,20,g,10,Room temp
+Chilli Potato with Pasta,Capsicum,15,g,7,Refrigerated
+Chilli Potato with Pasta,Cooking oil,15,ml,272,Normal
+Chilli Potato with Pasta,Salt,2,g,-1,Dry
+French Fries,Potato,180,g,7,Refrigerated
+French Fries,Cooking oil,20,ml,272,Normal
+French Fries,Salt,2,g,-1,Dry
+French Fries,Seasoning,2,g,180,"Airtight, dry"
+Chilli Potato,Potato,180,g,7,Refrigerated
+Chilli Potato,Corn flour,15,g,365,"Airtight, dry"
+Chilli Potato,Chilli sauce,15,g,180,Refrigerated after opening
+Chilli Potato,Soy sauce,8,ml,365,Normal
+Chilli Potato,Onion,20,g,10,Room temp
+Chilli Potato,Capsicum,15,g,7,Refrigerated
+Chilli Potato,Cooking oil,20,ml,272,Normal
+Chilli Potato,Salt,2,g,-1,Dry
+White Sauce Pasta,Pasta,90,g,365,"Airtight, dry"
+White Sauce Pasta,Milk,100,ml,5,Refrigerated
+White Sauce Pasta,Butter,10,g,30,Refrigerated
+White Sauce Pasta,Refined flour,10,g,180,"Airtight, dry"
+White Sauce Pasta,Cheese,20,g,30,Refrigerated
+White Sauce Pasta,Mixed herbs,2,g,365,"Airtight, dry"
+White Sauce Pasta,Salt,2,g,-1,Dry
+Red Sauce Pasta,Pasta,90,g,365,"Airtight, dry"
+Red Sauce Pasta,Tomato sauce,40,g,180,Refrigerated after opening
+Red Sauce Pasta,Tomato,30,g,7,Room temp
+Red Sauce Pasta,Onion,20,g,10,Room temp
+Red Sauce Pasta,Garlic,5,g,30,Room temp
+Red Sauce Pasta,Cooking oil,10,ml,272,Normal
+Red Sauce Pasta,Mixed herbs,2,g,365,"Airtight, dry"
+Red Sauce Pasta,Salt,2,g,-1,Dry
+Mix Sauce Pasta,Pasta,90,g,365,"Airtight, dry"
+Mix Sauce Pasta,Tomato sauce,25,g,180,Refrigerated after opening
+Mix Sauce Pasta,White sauce,50,g,2,Refrigerated
+Mix Sauce Pasta,Cheese,15,g,30,Refrigerated
+Mix Sauce Pasta,Mixed herbs,2,g,365,"Airtight, dry"
+Mix Sauce Pasta,Salt,2,g,-1,Dry
+Cheese Pasta,Pasta,90,g,365,"Airtight, dry"
+Cheese Pasta,Cheese,40,g,30,Refrigerated
+Cheese Pasta,Milk,60,ml,5,Refrigerated
+Cheese Pasta,Butter,10,g,30,Refrigerated
+Cheese Pasta,White sauce,40,g,2,Refrigerated
+Cheese Pasta,Mixed herbs,2,g,365,"Airtight, dry"
+Chowmein,Noodles,100,g,365,"Airtight, dry"
+Chowmein,Cabbage,30,g,7,Refrigerated
+Chowmein,Onion,20,g,10,Room temp
+Chowmein,Capsicum,20,g,7,Refrigerated
+Chowmein,Soy sauce,10,ml,365,Normal
+Chowmein,Cooking oil,10,ml,272,Normal
+Chowmein,Salt,2,g,-1,Dry
+Garlic Noodles (Chowmein),Noodles,100,g,365,"Airtight, dry"
+Garlic Noodles (Chowmein),Garlic,10,g,30,Room temp
+Garlic Noodles (Chowmein),Cabbage,30,g,7,Refrigerated
+Garlic Noodles (Chowmein),Onion,20,g,10,Room temp
+Garlic Noodles (Chowmein),Capsicum,20,g,7,Refrigerated
+Garlic Noodles (Chowmein),Soy sauce,10,ml,365,Normal
+Garlic Noodles (Chowmein),Cooking oil,10,ml,272,Normal
+Nutrela Chowmein,Noodles,90,g,365,"Airtight, dry"
+Nutrela Chowmein,Nutrela/soya chunks,30,g,365,"Airtight, dry"
+Nutrela Chowmein,Cabbage,25,g,7,Refrigerated
+Nutrela Chowmein,Onion,20,g,10,Room temp
+Nutrela Chowmein,Capsicum,15,g,7,Refrigerated
+Nutrela Chowmein,Soy sauce,10,ml,365,Normal
+Nutrela Chowmein,Cooking oil,10,ml,272,Normal
+Paneer Noodles,Noodles,90,g,365,"Airtight, dry"
+Paneer Noodles,Paneer,50,g,5,Refrigerated
+Paneer Noodles,Cabbage,25,g,7,Refrigerated
+Paneer Noodles,Onion,20,g,10,Room temp
+Paneer Noodles,Capsicum,15,g,7,Refrigerated
+Paneer Noodles,Soy sauce,10,ml,365,Normal
+Paneer Noodles,Cooking oil,10,ml,272,Normal
+Spring Roll,Spring-roll wrapper,30,g,30,Refrigerated
+Spring Roll,Cabbage,35,g,7,Refrigerated
+Spring Roll,Carrot,20,g,10,Refrigerated
+Spring Roll,Onion,15,g,10,Room temp
+Spring Roll,Cooking oil,15,ml,272,Normal
+Spring Roll,Salt,2,g,-1,Dry
+Gravy Spring Roll,Spring roll,60,g,1,Refrigerated
+Gravy Spring Roll,Onion,20,g,10,Room temp
+Gravy Spring Roll,Capsicum,15,g,7,Refrigerated
+Gravy Spring Roll,Gravy sauce,40,g,30,Refrigerated after opening
+Gravy Spring Roll,Cooking oil,8,ml,272,Normal
+Manchurian Gravy,Vegetable balls,100,g,1,Refrigerated
+Manchurian Gravy,Cabbage,20,g,7,Refrigerated
+Manchurian Gravy,Onion,20,g,10,Room temp
+Manchurian Gravy,Capsicum,15,g,7,Refrigerated
+Manchurian Gravy,Manchurian sauce,30,g,180,Refrigerated after opening
+Manchurian Gravy,Corn flour,8,g,365,"Airtight, dry"
+Manchurian Gravy,Cooking oil,12,ml,272,Normal
+Manchurian Dry,Vegetable balls,100,g,1,Refrigerated
+Manchurian Dry,Onion,20,g,10,Room temp
+Manchurian Dry,Capsicum,15,g,7,Refrigerated
+Manchurian Dry,Manchurian sauce,20,g,180,Refrigerated after opening
+Manchurian Dry,Cooking oil,12,ml,272,Normal
+Soya Chaap,Soya chaap,150,g,5,Refrigerated
+Soya Chaap,Yogurt,30,g,7,Refrigerated
+Soya Chaap,Spices,5,g,365,"Airtight, dry"
+Soya Chaap,Cooking oil,10,ml,272,Normal
+Soya Chaap Gravy,Soya chaap,130,g,5,Refrigerated
+Soya Chaap Gravy,Onion,30,g,10,Room temp
+Soya Chaap Gravy,Tomato,30,g,7,Room temp
+Soya Chaap Gravy,Cream,30,ml,5,Refrigerated
+Soya Chaap Gravy,Spices,5,g,365,"Airtight, dry"
+Soya Chaap Gravy,Cooking oil,10,ml,272,Normal
+Soya Chaap with Pasta,Soya chaap,90,g,5,Refrigerated
+Soya Chaap with Pasta,Pasta,80,g,365,"Airtight, dry"
+Soya Chaap with Pasta,Tomato sauce,20,g,180,Refrigerated after opening
+Soya Chaap with Pasta,Onion,15,g,10,Room temp
+Soya Chaap with Pasta,Capsicum,15,g,7,Refrigerated
+Soya Chaap with Pasta,Cooking oil,8,ml,272,Normal
+Fried Rice,Rice,120,g,365,"Airtight, dry"
+Fried Rice,Cabbage,20,g,7,Refrigerated
+Fried Rice,Carrot,20,g,10,Refrigerated
+Fried Rice,Onion,20,g,10,Room temp
+Fried Rice,Capsicum,15,g,7,Refrigerated
+Fried Rice,Soy sauce,10,ml,365,Normal
+Fried Rice,Cooking oil,10,ml,272,Normal
+Paneer Fried Rice,Rice,110,g,365,"Airtight, dry"
+Paneer Fried Rice,Paneer,50,g,5,Refrigerated
+Paneer Fried Rice,Cabbage,15,g,7,Refrigerated
+Paneer Fried Rice,Carrot,15,g,10,Refrigerated
+Paneer Fried Rice,Onion,20,g,10,Room temp
+Paneer Fried Rice,Capsicum,15,g,7,Refrigerated
+Paneer Fried Rice,Soy sauce,10,ml,365,Normal
+Noodles with Rice,Noodles,60,g,365,"Airtight, dry"
+Noodles with Rice,Rice,80,g,365,"Airtight, dry"
+Noodles with Rice,Cabbage,15,g,7,Refrigerated
+Noodles with Rice,Onion,20,g,10,Room temp
+Noodles with Rice,Capsicum,15,g,7,Refrigerated
+Noodles with Rice,Soy sauce,10,ml,365,Normal
+Noodles with Rice,Cooking oil,10,ml,272,Normal
+Fry Rice with Manchurian,Rice,100,g,365,"Airtight, dry"
+Fry Rice with Manchurian,Vegetable balls,80,g,1,Refrigerated
+Fry Rice with Manchurian,Onion,20,g,10,Room temp
+Fry Rice with Manchurian,Capsicum,15,g,7,Refrigerated
+Fry Rice with Manchurian,Soy sauce,8,ml,365,Normal
+Fry Rice with Manchurian,Manchurian sauce,15,g,180,Refrigerated after opening
+Fry Rice with Manchurian,Cooking oil,10,ml,272,Normal
+Momos Veg.,Momo wrapper,40,g,30,Refrigerated
+Momos Veg.,Cabbage,40,g,7,Refrigerated
+Momos Veg.,Carrot,20,g,10,Refrigerated
+Momos Veg.,Onion,15,g,10,Room temp
+Momos Veg.,Garlic,5,g,30,Room temp
+Momos Veg.,Spices,3,g,365,"Airtight, dry"
+Momos Gravy,Vegetable momos,100,g,1,Refrigerated
+Momos Gravy,Onion,20,g,10,Room temp
+Momos Gravy,Tomato,30,g,7,Room temp
+Momos Gravy,Gravy sauce,30,g,30,Refrigerated after opening
+Momos Gravy,Cooking oil,8,ml,272,Normal
+Momos Gravy with Rice,Vegetable momos,90,g,1,Refrigerated
+Momos Gravy with Rice,Rice,100,g,365,"Airtight, dry"
+Momos Gravy with Rice,Onion,20,g,10,Room temp
+Momos Gravy with Rice,Tomato,25,g,7,Room temp
+Momos Gravy with Rice,Gravy sauce,30,g,30,Refrigerated after opening
+Onion Tomato Capsicum Cheese Pasta,Pasta,90,g,365,"Airtight, dry"
+Onion Tomato Capsicum Cheese Pasta,Onion,20,g,10,Room temp
+Onion Tomato Capsicum Cheese Pasta,Tomato,25,g,7,Room temp
+Onion Tomato Capsicum Cheese Pasta,Capsicum,20,g,7,Refrigerated
+Onion Tomato Capsicum Cheese Pasta,Cheese,30,g,30,Refrigerated
+Onion Tomato Capsicum Cheese Pasta,Pizza/pasta sauce,20,g,180,Refrigerated after opening
+Onion Corn Capsicum Cheese Pizza,Pizza base,120,g,5,Refrigerated
+Onion Corn Capsicum Cheese Pizza,Onion,20,g,10,Room temp
+Onion Corn Capsicum Cheese Pizza,Corn,25,g,5,Refrigerated
+Onion Corn Capsicum Cheese Pizza,Capsicum,20,g,7,Refrigerated
+Onion Corn Capsicum Cheese Pizza,Cheese,50,g,30,Refrigerated
+Onion Corn Capsicum Cheese Pizza,Pizza sauce,25,g,180,Refrigerated after opening
+Capsicum Cheese,Pizza base,120,g,5,Refrigerated
+Capsicum Cheese,Capsicum,30,g,7,Refrigerated
+Capsicum Cheese,Cheese,50,g,30,Refrigerated
+Capsicum Cheese,Pizza sauce,25,g,180,Refrigerated after opening
+Tomato Cheese,Pizza base,120,g,5,Refrigerated
+Tomato Cheese,Tomato,40,g,7,Room temp
+Tomato Cheese,Cheese,50,g,30,Refrigerated
+Tomato Cheese,Pizza sauce,25,g,180,Refrigerated after opening
+Onion Cheese,Pizza base,120,g,5,Refrigerated
+Onion Cheese,Onion,35,g,10,Room temp
+Onion Cheese,Cheese,50,g,30,Refrigerated
+Onion Cheese,Pizza sauce,25,g,180,Refrigerated after opening
+Only Cheese Pizza,Pizza base,120,g,5,Refrigerated
+Only Cheese Pizza,Cheese,70,g,30,Refrigerated
+Only Cheese Pizza,Pizza sauce,25,g,180,Refrigerated after opening
+Corn Cheese,Pizza base,120,g,5,Refrigerated
+Corn Cheese,Corn,40,g,5,Refrigerated
+Corn Cheese,Cheese,50,g,30,Refrigerated
+Corn Cheese,Pizza sauce,25,g,180,Refrigerated after opening
+Mushroom Cheese,Pizza base,120,g,5,Refrigerated
+Mushroom Cheese,Mushroom,40,g,5,Refrigerated
+Mushroom Cheese,Cheese,50,g,30,Refrigerated
+Mushroom Cheese,Pizza sauce,25,g,180,Refrigerated after opening
+Paneer with Capsicum Onion Cheese,Pizza base,120,g,5,Refrigerated
+Paneer with Capsicum Onion Cheese,Paneer,60,g,5,Refrigerated
+Paneer with Capsicum Onion Cheese,Capsicum,25,g,7,Refrigerated
+Paneer with Capsicum Onion Cheese,Onion,25,g,10,Room temp
+Paneer with Capsicum Onion Cheese,Cheese,60,g,30,Refrigerated
+Paneer with Capsicum Onion Cheese,Pizza sauce,25,g,180,Refrigerated after opening
+Paneer Cheese,Pizza base,120,g,5,Refrigerated
+Paneer Cheese,Paneer,60,g,5,Refrigerated
+Paneer Cheese,Cheese,60,g,30,Refrigerated
+Paneer Cheese,Pizza sauce,25,g,180,Refrigerated after opening
+Paneer Tikka Cheese,Pizza base,120,g,5,Refrigerated
+Paneer Tikka Cheese,Paneer tikka,60,g,2,Refrigerated
+Paneer Tikka Cheese,Cheese,60,g,30,Refrigerated
+Paneer Tikka Cheese,Pizza sauce,25,g,180,Refrigerated after opening
+Double Cheese,Pizza base,120,g,5,Refrigerated
+Double Cheese,Cheese,100,g,30,Refrigerated
+Double Cheese,Pizza sauce,25,g,180,Refrigerated after opening

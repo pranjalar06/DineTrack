@@ -1,0 +1,9 @@
+{
+  "restaurant_name": "AJ Fast Food",
+  "lead_time_days": 2,
+  "safety_stock_days": 2,
+  "critical_days": 2.0,
+  "low_days": 4.0,
+  "normal_days": 7.0,
+  "refresh_interval_seconds": 0
+}

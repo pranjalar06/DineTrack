@@ -2,10 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, Bell, BellRing,
   Boxes, CalendarDays, CheckCircle2, ChevronRight, CircleCheck, Command,
-  CreditCard, Download, Droplets, Flame, Gauge, LayoutDashboard, Leaf,
-  MoreHorizontal, Minus, Moon, Package, Plus, Receipt, RefreshCw, Save, Search,
-  Settings as SettingsIcon, ShoppingCart,
-  Sparkles, Sun, Trash2, TrendingUp, UtensilsCrossed, X, Zap
+  CreditCard, Download, HandHeart, Sprout, Droplets, Flame, Gauge, LayoutDashboard, Leaf, Lock, LogOut,
+  Mail, MoreHorizontal, Minus, Moon, Package, Plus, Receipt, RefreshCw, Save, Search,
+  Settings as SettingsIcon, ShoppingCart, Store,
+  Sparkles, Sun, Trash2, TrendingUp, Upload, User, UtensilsCrossed, X, Zap
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, CartesianGrid, Cell, LineChart, Line,
@@ -13,6 +13,38 @@ import {
 } from "recharts";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+// The AJ Fast Food account is backed by real data; every other account
+// signs up into an empty workspace with the same pages.
+const DEMO_WORKSPACE = "ajfastfood";
+
+const TOKEN_KEY = "dinetrack-token";
+function readToken() {
+  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+}
+function writeToken(token) {
+  try { token ? localStorage.setItem(TOKEN_KEY, token) : localStorage.removeItem(TOKEN_KEY); } catch {}
+}
+
+let authToken = readToken();
+let onUnauthorized = () => {};
+
+async function apiFetch(path, options = {}) {
+  const r = await fetch(`${API}${path}`, {
+    ...options,
+    headers: {
+      // FormData uploads set their own multipart Content-Type
+      ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...options.headers
+    }
+  });
+  if (r.status === 401) {
+    onUnauthorized();
+    throw new Error("Session expired");
+  }
+  return r;
+}
 
 const nav = [
   ["overview", "Overview", LayoutDashboard],
@@ -22,6 +54,7 @@ const nav = [
   ["forecast", "Demand Forecast", TrendingUp],
   ["orders", "Purchase Orders", ShoppingCart],
   ["waste", "Waste Control", Leaf],
+  ["data", "Data Upload", Upload],
 ];
 
 const PRIMARY_TAB_IDS = ["overview", "pos", "orders", "inventory"];
@@ -102,7 +135,140 @@ function Empty({ text = "No records found" }) {
 }
 
 function App() {
+  const [user, setUser] = useState(null);
+  const [checking, setChecking] = useState(!!authToken);
+
+  useEffect(() => {
+    try { document.documentElement.setAttribute("data-theme", localStorage.getItem("dinetrack-theme") || "dark"); } catch {}
+    onUnauthorized = logout;
+    if (!authToken) return;
+    apiFetch("/api/auth/me")
+      .then(r => r.json())
+      .then(setUser)
+      .catch(() => {})
+      .finally(() => setChecking(false));
+  }, []);
+
+  function handleAuth({ token, user }) {
+    authToken = token;
+    writeToken(token);
+    setUser(user);
+  }
+
+  function logout() {
+    authToken = null;
+    writeToken(null);
+    setUser(null);
+  }
+
+  if (checking) return <div className="auth-shell"><div className="auth-loading">Loading DineTrack…</div></div>;
+  if (!user) return <AuthPage onAuth={handleAuth}/>;
+  return <Dashboard key={user.email} user={user} onLogout={logout}/>;
+}
+
+function AuthPage({ onAuth }) {
+  const [mode, setMode] = useState("login");
+  const [form, setForm] = useState({ name: "", restaurant_name: "", email: "", password: "" });
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const isSignup = mode === "signup";
+
+  function set(key, value) {
+    setForm(prev => ({ ...prev, [key]: value }));
+  }
+
+  function switchMode(next) {
+    setMode(next);
+    setError("");
+  }
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const body = isSignup ? form : { email: form.email, password: form.password };
+      const r = await fetch(`${API}/api/auth/${mode}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Please fill in every field");
+      onAuth(data);
+    } catch (e) {
+      setError(e.message === "Failed to fetch" ? `Could not reach the DineTrack API at ${API}. Start FastAPI first.` : e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="auth-shell">
+    <div className="auth-panel">
+      <div className="auth-intro">
+        <div className="brand">
+          <div className="brand-mark"><UtensilsCrossed size={21}/></div>
+          <div><strong>DineTrack</strong><span>Inventory intelligence</span></div>
+        </div>
+        <h1>Forecast demand.<br/>Cut waste.<br/>Never run out.</h1>
+        <p>ARIMA demand forecasting, live inventory and smart reorders for your restaurant kitchen.</p>
+        <ul>
+          <li><TrendingUp size={15}/> 7-day demand forecasts per menu item</li>
+          <li><Boxes size={15}/> Stock coverage and reorder alerts</li>
+          <li><Leaf size={15}/> Waste risk on perishables</li>
+        </ul>
+      </div>
+
+      <form className="card auth-card" onSubmit={submit}>
+        <div className="auth-tabs">
+          <button type="button" className={!isSignup ? "active" : ""} onClick={() => switchMode("login")}>Sign in</button>
+          <button type="button" className={isSignup ? "active" : ""} onClick={() => switchMode("signup")}>Create account</button>
+        </div>
+
+        <div>
+          <h2>{isSignup ? "Set up your restaurant" : "Welcome back"}</h2>
+          <p className="auth-sub">{isSignup ? "Start with an empty workspace and add your own data." : "Sign in to open your kitchen dashboard."}</p>
+        </div>
+
+        {error && <div className="error-banner"><AlertTriangle size={18}/><span>{error}</span></div>}
+
+        {isSignup && <>
+          <div className="field">
+            <label>Your name</label>
+            <div className="input-icon"><User size={15}/><input value={form.name} onChange={e => set("name", e.target.value)} placeholder="Full name" required autoComplete="name"/></div>
+          </div>
+          <div className="field">
+            <label>Restaurant name</label>
+            <div className="input-icon"><Store size={15}/><input value={form.restaurant_name} onChange={e => set("restaurant_name", e.target.value)} placeholder="e.g. Spice Corner" required/></div>
+          </div>
+        </>}
+
+        <div className="field">
+          <label>Email</label>
+          <div className="input-icon"><Mail size={15}/><input type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="you@restaurant.com" required autoComplete="email"/></div>
+        </div>
+        <div className="field">
+          <label>Password</label>
+          <div className="input-icon"><Lock size={15}/><input type="password" value={form.password} onChange={e => set("password", e.target.value)} placeholder={isSignup ? "At least 6 characters" : "Your password"} required minLength={isSignup ? 6 : undefined} autoComplete={isSignup ? "new-password" : "current-password"}/></div>
+        </div>
+
+        <button className="primary auth-submit" type="submit" disabled={busy}>
+          {busy ? "Please wait…" : isSignup ? "Create account" : "Sign in"} <ChevronRight size={16}/>
+        </button>
+
+        <p className="auth-switch">
+          {isSignup ? "Already have an account?" : "New to DineTrack?"}{" "}
+          <button type="button" className="text-btn" onClick={() => switchMode(isSignup ? "login" : "signup")}>{isSignup ? "Sign in" : "Create an account"}</button>
+        </p>
+      </form>
+    </div>
+  </div>
+}
+
+function Dashboard({ user, onLogout }) {
+  const isBlank = user.workspace !== DEMO_WORKSPACE;
   const [page, setPage] = useState("overview");
+  const [accountOpen, setAccountOpen] = useState(false);
   const [dashboard, setDashboard] = useState(fallback);
   const [inventory, setInventory] = useState([]);
   const [forecast, setForecast] = useState([]);
@@ -112,6 +278,7 @@ function App() {
   const [accuracy, setAccuracy] = useState({ overall: {}, items: [] });
   const [salesLog, setSalesLog] = useState({ orders: [], today_total: 0, today_orders: 0 });
   const [settings, setSettings] = useState(defaultSettings);
+  const [dataStatus, setDataStatus] = useState({});
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [query, setQuery] = useState("");
@@ -130,7 +297,7 @@ function App() {
   }, [theme]);
 
   async function get(path) {
-    const r = await fetch(`${API}${path}`);
+    const r = await apiFetch(path);
     if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
     return r.json();
   }
@@ -139,7 +306,7 @@ function App() {
     setLoading(true);
     setError("");
     try {
-      const [d, i, f, o, w, m, a, s, st] = await Promise.all([
+      const [d, i, f, o, w, m, a, s, st, ds] = await Promise.all([
         get("/api/dashboard"),
         get("/api/inventory"),
         get("/api/forecast"),
@@ -148,7 +315,8 @@ function App() {
         get("/api/menu"),
         get("/api/accuracy"),
         get("/api/sales/log"),
-        get("/api/settings")
+        get("/api/settings"),
+        get("/api/data/status")
       ]);
       setDashboard(d);
       setInventory(i.inventory || []);
@@ -159,9 +327,10 @@ function App() {
       setAccuracy(a || { overall: {}, items: [] });
       setSalesLog(s || { orders: [], today_total: 0, today_orders: 0 });
       setSettings(st || defaultSettings);
+      setDataStatus(ds || {});
       setLastUpdated(new Date());
     } catch (e) {
-      setError(`Could not connect to DineTrack API at ${API}. Start FastAPI first, then refresh.`);
+      if (e.message !== "Session expired") setError(`Could not connect to DineTrack API at ${API}. Start FastAPI first, then refresh.`);
     } finally {
       setLoading(false);
     }
@@ -171,9 +340,8 @@ function App() {
     setSettingsSaving(true);
     setSettingsError("");
     try {
-      const r = await fetch(`${API}/api/settings`, {
+      const r = await apiFetch("/api/settings", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(next)
       });
       const data = await r.json();
@@ -278,7 +446,7 @@ function App() {
           <span className="eyebrow">WORKSPACE</span>
           <button className="restaurant-switch">
             <span className="restaurant-avatar">{initials(settings.restaurant_name)}</span>
-            <span><b>{settings.restaurant_name}</b><small>Restaurant · Live</small></span>
+            <span><b>{settings.restaurant_name}</b><small>{isBlank ? "Restaurant · New workspace" : "Restaurant · Live"}</small></span>
             <ChevronRight size={16}/>
           </button>
         </div>
@@ -296,6 +464,9 @@ function App() {
         <div className="sidebar-bottom">
           <button className={page === "settings" ? "nav-item active" : "nav-item"} onClick={() => navigate("settings")}>
             <SettingsIcon size={18}/><span>Settings</span>
+          </button>
+          <button className="nav-item" onClick={onLogout}>
+            <LogOut size={18}/><span>Sign out</span>
           </button>
           <div className="powered"><Sparkles size={15}/> AI-assisted demand planning</div>
         </div>
@@ -316,7 +487,17 @@ function App() {
             <button className="icon-btn" onClick={() => setTheme(t => t === "dark" ? "light" : "dark")} title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}>
               {theme === "dark" ? <Sun size={16}/> : <Moon size={16}/>}
             </button>
-            <button className="avatar">{initials(settings.restaurant_name)}</button>
+            <div className="account">
+              <button className="avatar" onClick={() => setAccountOpen(v => !v)} title={user.email}>{initials(user.name || settings.restaurant_name)}</button>
+              {accountOpen && <>
+                <div className="account-backdrop" onClick={() => setAccountOpen(false)}/>
+                <div className="account-menu">
+                  <div className="account-id"><b>{user.name}</b><span>{user.email}</span></div>
+                  <button onClick={() => { setAccountOpen(false); navigate("settings"); }}><SettingsIcon size={15}/> Settings</button>
+                  <button onClick={onLogout}><LogOut size={15}/> Sign out</button>
+                </div>
+              </>}
+            </div>
           </div>
         </header>
 
@@ -351,13 +532,14 @@ function App() {
         <section className="content">
           {error && <div className="error-banner"><AlertTriangle size={18}/><span>{error}</span><button onClick={load}>Retry</button></div>}
 
-          {page === "overview" && <Overview dashboard={dashboard} accuracyChart={accuracyChart} topForecast={topForecast} inventory={inventory} waste={waste} navigate={navigate} loading={loading}/>}
+          {page === "overview" && <Overview isBlank={isBlank} restaurantName={settings.restaurant_name} dataStatus={dataStatus} dashboard={dashboard} accuracyChart={accuracyChart} topForecast={topForecast} inventory={inventory} waste={waste} navigate={navigate} loading={loading}/>}
           {page === "pos" && <PointOfSale menu={menu} loading={loading} onSaleComplete={load}/>}
           {page === "saleslog" && <SalesLog log={salesLog} loading={loading}/>}
           {page === "inventory" && <Inventory rows={filteredInventory} loading={loading} navigate={navigate}/>}
           {page === "forecast" && <Forecast rows={filteredForecast} chart={forecastChart} top={topForecast} accuracy={accuracy} loading={loading}/>}
           {page === "orders" && <Orders rows={orders} loading={loading}/>}
           {page === "waste" && <Waste rows={waste} loading={loading}/>}
+          {page === "data" && <DataUpload status={dataStatus} onUploaded={load}/>}
           {page === "settings" && <SettingsPage settings={settings} onSave={saveSettings} saving={settingsSaving} error={settingsError}/>}
 
           <footer>
@@ -404,17 +586,39 @@ function PageHeading({ eyebrow, title, sub, action }) {
   </div>
 }
 
-function Overview({ dashboard, accuracyChart, topForecast, inventory, waste, navigate, loading }) {
+function Overview({ isBlank, restaurantName, dataStatus, dashboard, accuracyChart, topForecast, inventory, waste, navigate, loading }) {
   const inv = dashboard.inventory || fallback.inventory;
   const ma = dashboard.model_accuracy || {};
   const maxTop = Math.max(...topForecast.map(x => x.demand), 1);
+  const steps = [
+    ["menu", "Upload your menu", "Dishes and the ingredients (grams per serving) each one uses."],
+    ["inventory", "Upload kitchen stock", "Current inventory per ingredient, with units and category."],
+    ["sales", "Upload sales history", "A few weeks of daily sales unlocks forecasts and accuracy."]
+  ];
+  const setupIncomplete = !loading && steps.some(([kind]) => dataStatus[kind] && !dataStatus[kind].uploaded);
   return <div>
     <PageHeading
       eyebrow="GOOD EVENING"
-      title="Kitchen, under control."
+      title={isBlank && setupIncomplete ? `Welcome, ${restaurantName}.` : "Kitchen, under control."}
       sub={dashboard.sales_period?.start ? `Forecasting from ${shortDate(dashboard.sales_period.start)} to ${shortDate(dashboard.sales_period.end)} · Next 7 days` : "Live inventory intelligence"}
       action={<button className="primary" onClick={() => navigate("orders")}><ShoppingCart size={17}/> Review orders <ChevronRight size={16}/></button>}
     />
+
+    {setupIncomplete && (
+      <section className="card onboarding">
+        <div className="onboarding-head">
+          <div className="brand-mark"><Sparkles size={19}/></div>
+          <div><h2>Finish setting up your workspace</h2><p>Every page works the same way as a live restaurant. They fill in as soon as your data is uploaded.</p></div>
+        </div>
+        <div className="onboarding-steps">
+          {steps.map(([kind, title, desc], i) => {
+            const done = dataStatus[kind]?.uploaded;
+            return <div key={kind} className={done ? "done" : ""}><span>{done ? <CheckCircle2 size={14}/> : i + 1}</span><b>{title}</b><small>{done ? "Uploaded" : desc}</small></div>;
+          })}
+        </div>
+        <button className="primary" onClick={() => navigate("data")}><Upload size={15}/> Upload your data <ChevronRight size={16}/></button>
+      </section>
+    )}
 
     <div className="kpi-grid five">
       <KPI icon={TrendingUp} label="7-day expected demand" value={num(dashboard.forecast?.total_expected_units, 0)} suffix="units" tone="blue" trend="ARIMA forecast"/>
@@ -434,7 +638,14 @@ function Overview({ dashboard, accuracyChart, topForecast, inventory, waste, nav
             <span className="mini-label"><Gauge size={13}/> {ma.accuracy_pct != null ? `${num(ma.accuracy_pct,1)}% accurate` : "Backtest pending"}</span>
           </div>
         </div>
-        <div className="chart-wrap">{accuracyChart.length ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={accuracyChart} margin={{top:10,right:8,left:-22,bottom:0}}><defs><linearGradient id="actualFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#8fc194" stopOpacity={0.3}/><stop offset="100%" stopColor="#8fc194" stopOpacity={0}/></linearGradient></defs><CartesianGrid vertical={false} strokeDasharray="4 5" stroke={chartGridColor}/><XAxis dataKey="date" tickLine={false} axisLine={false} tick={{fill:chartTickColor}}/><YAxis tickLine={false} axisLine={false} tick={{fill:chartTickColor}}/><Tooltip contentStyle={chartTooltipStyle} labelStyle={{color:chartTickColor}}/><Area type="monotone" dataKey="actual" name="Actual" strokeWidth={2.5} fill="url(#actualFill)" stroke="#8fc194"/><Area type="monotone" dataKey="predicted" name="Predicted" strokeWidth={2} strokeDasharray="5 4" fill="none" stroke="#5fc3dd"/></AreaChart></ResponsiveContainer> : <Empty text={loading ? "Loading backtest…" : "Not enough sales history for a backtest"}/>}</div>
+        <div className="chart-wrap">{accuracyChart.length ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={accuracyChart} margin={{top:10,right:8,left:-22,bottom:0}}><defs><linearGradient id="actualFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#8fc194" stopOpacity={0.3}/><stop offset="100%" stopColor="#8fc194" stopOpacity={0}/></linearGradient></defs><CartesianGrid vertical={false} strokeDasharray="4 5" stroke={chartGridColor}/><XAxis dataKey="date" tickLine={false} axisLine={false} tick={{fill:chartTickColor}}/>
+        <YAxis
+  domain={[160, 400]}
+  ticks={[160, 200, 240, 280, 320, 360, 400]}
+  tickLine={false}
+  axisLine={false}
+  tick={{fill:chartTickColor}}
+/><Tooltip contentStyle={chartTooltipStyle} labelStyle={{color:chartTickColor}}/><Area type="monotone" dataKey="actual" name="Actual" strokeWidth={2.5} fill="url(#actualFill)" stroke="#8fc194"/><Area type="monotone" dataKey="predicted" name="Predicted" strokeWidth={2} strokeDasharray="5 4" fill="none" stroke="#5fc3dd"/></AreaChart></ResponsiveContainer> : <Empty text={loading ? "Loading backtest…" : "Not enough sales history for a backtest"}/>}</div>
       </section>
 
       <section className="card alerts-card">
@@ -525,9 +736,8 @@ function PointOfSale({ menu, loading, onSaleComplete }) {
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetch(`${API}/api/pos/sale`, {
+      const res = await apiFetch("/api/pos/sale", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cart: lines.map(l => ({ item: l.item, size: l.size, quantity: l.quantity }))
         })
@@ -572,7 +782,7 @@ function PointOfSale({ menu, loading, onSaleComplete }) {
               </div>
             </div>
           ))}
-          {!filteredMenu.length && <Empty text={loading ? "Loading menu…" : "No menu items match your search"}/>}
+          {!filteredMenu.length && <Empty text={loading ? "Loading menu…" : !menu.length ? "No menu yet. Upload your menu and sales history on the Data Upload page." : "No menu items match your search"}/>}
         </div>
       </div>
 
@@ -988,13 +1198,124 @@ function usedInLabel(usedIn) {
   return [...shown, ...(extra > 0 ? [`+${extra} more`] : [])];
 }
 
+const DISPOSAL = {
+  GARDENING: { label: "Gardening", icon: Sprout, cls: "garden" },
+  DONATE: { label: "Donate", icon: HandHeart, cls: "donate" }
+};
+
+function DisposalTag({ route }) {
+  const d = DISPOSAL[route];
+  if (!d) return null;
+  const Icon = d.icon;
+  return <span className={`disposal-tag ${d.cls}`}><Icon size={12}/> {d.label}</span>;
+}
+
 function Waste({ rows, loading }) {
+  const [route, setRoute] = useState("ALL");
   const high=rows.filter(x=>x.Waste_Risk==="HIGH").length, med=rows.filter(x=>x.Waste_Risk==="MEDIUM").length;
+  const garden=rows.filter(x=>x.Disposal_Route==="GARDENING").length, donate=rows.filter(x=>x.Disposal_Route==="DONATE").length;
+  const shown = route==="ALL" ? rows : rows.filter(x=>x.Disposal_Route===route);
   return <div><PageHeading eyebrow="WASTE CONTROL" title="Waste prevention" sub="Prioritize excess perishable stock before it becomes food waste."/>
-    <div className="kpi-grid compact"><KPI icon={Flame} label="High risk" value={high} suffix="ingredients" tone="red" trend="Immediate action"/><KPI icon={Droplets} label="Medium risk" value={med} suffix="ingredients" tone="amber" trend="Monitor closely"/><KPI icon={Leaf} label="Risk records" value={rows.length} suffix="total" tone="green" trend="Next 7 days"/></div>
-    <div className="waste-grid">{rows.map((x,i)=><section className={`card waste-card ${String(x.Waste_Risk).toLowerCase()}`} key={i}><div className="waste-card-head"><div className="signal"><Leaf size={17}/></div><StatusPill status={x.Waste_Risk}/></div><h2>{x.Ingredient}</h2><div className="waste-metrics"><div><span>Current stock</span><b>{formatQty(x.Current_Inventory, x.Unit)}</b></div><div><span>Expected usage</span><b>{formatQty(x.Expected_7_Day_Usage, x.Unit)}</b></div><div><span>Expected excess</span><b>{formatQty(x.Expected_Excess, x.Unit)}</b></div></div>{usedInLabel(x.Used_In) && <div className="used-in-row">{usedInLabel(x.Used_In).map((d,j)=><span className="mini-label" key={j}>{d}</span>)}</div>}<div className="suggestion"><Sparkles size={16}/><span>{x.Waste_Reduction_Suggestion}</span></div></section>)}</div>
+    <div className="kpi-grid"><KPI icon={Flame} label="High risk" value={high} suffix="ingredients" tone="red" trend="Immediate action"/><KPI icon={Droplets} label="Medium risk" value={med} suffix="ingredients" tone="amber" trend="Monitor closely"/><KPI icon={Sprout} label="For gardening" value={garden} suffix="items" tone="green" trend="Compost scraps & spoilage"/><KPI icon={HandHeart} label="To donate" value={donate} suffix="items" tone="blue" trend="Give before expiry"/></div>
+    {rows.length>0 && <div className="disposal-filter">{[["ALL","All"],["GARDENING","Gardening"],["DONATE","Donate"]].map(([k,l])=><button key={k} className={route===k?"active":""} onClick={()=>setRoute(k)}>{l}</button>)}</div>}
+    <div className="waste-grid">{shown.map((x,i)=><section className={`card waste-card ${String(x.Waste_Risk).toLowerCase()}`} key={i}><div className="waste-card-head"><div className="signal"><Leaf size={17}/></div><div className="waste-card-tags"><DisposalTag route={x.Disposal_Route}/><StatusPill status={x.Waste_Risk}/></div></div><h2>{x.Ingredient}</h2><div className="waste-metrics"><div><span>Current stock</span><b>{formatQty(x.Current_Inventory, x.Unit)}</b></div><div><span>Expected usage</span><b>{formatQty(x.Expected_7_Day_Usage, x.Unit)}</b></div><div><span>Expected excess</span><b>{formatQty(x.Expected_Excess, x.Unit)}</b></div></div>{usedInLabel(x.Used_In) && <div className="used-in-row">{usedInLabel(x.Used_In).map((d,j)=><span className="mini-label" key={j}>{d}</span>)}</div>}<div className="suggestion"><Sparkles size={16}/><span>{x.Waste_Reduction_Suggestion}</span></div>{x.Disposal_Note && <div className={`disposal-note ${DISPOSAL[x.Disposal_Route]?.cls || ""}`}>{x.Disposal_Route==="GARDENING"?<Sprout size={16}/>:<HandHeart size={16}/>}<span>{x.Disposal_Note}</span></div>}</section>)}</div>
     {!rows.length&&<div className="card"><Empty text={loading?"Loading waste analysis…":"No medium/high waste risks detected."}/></div>}
   </div>
+}
+
+const DATASETS = [
+  {
+    kind: "menu", icon: UtensilsCrossed, title: "Menu & recipes",
+    desc: "One row per dish ingredient: how many grams (or ml) of each ingredient a half/base serving uses. Medium and Large are scaled automatically."
+  },
+  {
+    kind: "inventory", icon: Boxes, title: "Kitchen inventory",
+    desc: "Current stock of every ingredient. Use the same ingredient names and units as the menu file. Category \"Perishable\" enables waste tracking."
+  },
+  {
+    kind: "sales", icon: TrendingUp, title: "Sales history",
+    desc: "Daily quantity sold per dish and size (Half, Medium or Large), with its price. Prices here also build the Point of Sale menu."
+  }
+];
+
+function DataUpload({ status, onUploaded }) {
+  return <div>
+    <PageHeading eyebrow="DATA" title="Upload your data" sub="Upload CSV or Excel files. The forecast, inventory status and waste analysis recalculate as soon as a file is uploaded."/>
+    <div className="notice"><Sparkles size={18}/><div><b>Not sure about the format?</b><span>Download a template, fill it in with your own data, and upload it back. Column names are not case-sensitive.</span></div></div>
+    <div className="upload-grid">
+      {DATASETS.map(d => <UploadCard key={d.kind} {...d} status={status[d.kind]} onUploaded={onUploaded}/>)}
+    </div>
+  </div>
+}
+
+function UploadCard({ kind, icon: Icon, title, desc, status, onUploaded }) {
+  const [file, setFile] = useState(null);
+  const [mode, setMode] = useState("replace");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState("");
+  const [inputKey, setInputKey] = useState(0);
+  const uploaded = status?.uploaded;
+
+  async function upload() {
+    if (!file) return;
+    setBusy(true);
+    setError("");
+    setDone("");
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const r = await apiFetch(`/api/data/upload/${kind}?mode=${mode}`, { method: "POST", body });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || "Upload failed");
+      setDone(`${file.name} uploaded · ${data.rows} rows${mode === "append" ? " in total" : ""}`);
+      setFile(null);
+      setInputKey(k => k + 1);
+      await onUploaded();
+    } catch (e) {
+      setError(e.message || "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <section className="card upload-card">
+    <div className="upload-card-head">
+      <div className="signal"><Icon size={17}/></div>
+      {status ? <StatusPill status={uploaded ? "Uploaded" : "Not uploaded"}/> : null}
+    </div>
+    <h2>{title}</h2>
+    <p>{desc}</p>
+    <div className="upload-columns">
+      {(status?.columns || []).map(c => <span key={c} className={status.required_columns.includes(c) ? "mini-label required" : "mini-label"}>{c}</span>)}
+    </div>
+    <small className="upload-hint">Highlighted columns are required; the rest are optional.</small>
+
+    {error && <div className="error-banner"><AlertTriangle size={18}/><span>{error}</span></div>}
+    {done && <div className="success-banner"><CheckCircle2 size={18}/><div><b>Dashboard updated</b><span>{done}</span></div></div>}
+
+    <label className="file-drop">
+      <input key={inputKey} type="file" accept=".csv,.xlsx,.xls" onChange={e => { setFile(e.target.files[0] || null); setError(""); setDone(""); }}/>
+      <Upload size={16}/><span>{file ? file.name : "Choose a .csv or .xlsx file"}</span>
+    </label>
+
+    {kind === "sales" && uploaded && (
+      <div className="field">
+        <label>When uploading</label>
+        <select value={mode} onChange={e => setMode(e.target.value)}>
+          <option value="replace">Replace existing sales history</option>
+          <option value="append">Add to existing sales history</option>
+        </select>
+      </div>
+    )}
+
+    <div className="upload-actions">
+      <a className="secondary" href={`${API}/api/data/template/${kind}`} download><Download size={15}/> Template</a>
+      <button className="primary" disabled={!file || busy} onClick={upload}>
+        <Upload size={15}/> {busy ? "Uploading & recalculating…" : uploaded ? "Upload & update" : "Upload"}
+      </button>
+    </div>
+  </section>
 }
 
 function SettingsPage({ settings, onSave, saving, error }) {

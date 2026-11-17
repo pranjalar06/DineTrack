@@ -1,41 +1,24 @@
+import hashlib
 import os
 import threading
-import uuid
-from datetime import date, datetime
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Response, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-import pandas as pd
-
-from services.forecasting import (
-    load_sales,
-    forecast_all_items,
-    trim_sparse_trailing_days,
-    SIZE_MULTIPLIER
+from services.auth import (
+    UserStore,
+    public_user,
+    DEMO_WORKSPACE
 )
 
-from services.inventory import (
-    calculate_inventory_status
-)
-
-from services.waste import (
-    calculate_waste
-)
-
-from services.accuracy import (
-    backtest_accuracy
-)
-
-from services.pos import (
-    build_menu,
-    compute_consumption
-)
-
-from services.settings import (
-    load_settings,
-    save_settings
+from services.workspace import (
+    UPLOADS,
+    Workspace,
+    normalise_upload,
+    read_upload,
+    template_csv
 )
 
 
@@ -77,145 +60,134 @@ app.add_middleware(
 # FILE PATHS
 # =========================================================
 
-SALES_FILE = (
-    "data/two_month_sales_data.csv"
+# AJ Fast Food's data lives directly in data/; every other account
+# gets its own directory under data/workspaces/ with the same files.
+DEMO_DATA_DIR = "data"
+
+WORKSPACES_DIR = (
+    "data/workspaces"
 )
 
-INVENTORY_FILE = (
-    "data/current_kitchen_inventory.csv"
+USERS_FILE = (
+    "data/users.json"
 )
 
-RECIPES_FILE = (
-    "data/menu_ingredient_level.csv"
-)
-
-RAW_SALES_COLUMNS = [
-    "Date", "Item", "Size", "Quantity_Sold",
-    "Unit_Price", "Total_Sales", "Day", "Month"
-]
-
-POS_LOG_FILE = (
-    "data/pos_sales_log.csv"
-)
-
-POS_LOG_COLUMNS = [
-    "OrderId", "Timestamp", "Item", "Size",
-    "Quantity", "Unit_Price", "Line_Total"
-]
-
-SETTINGS_FILE = (
-    "data/settings.json"
+AUTH_SECRET_FILE = (
+    "data/.auth_secret"
 )
 
 
 # =========================================================
-# LOAD DATA
+# WORKSPACES
 # =========================================================
 
-sales = load_sales(
-    SALES_FILE
-)
+users = UserStore(USERS_FILE, AUTH_SECRET_FILE)
 
-inventory = pd.read_csv(
-    INVENTORY_FILE
-)
+workspaces = {
+    DEMO_WORKSPACE: Workspace(DEMO_DATA_DIR)
+}
 
-recipes = pd.read_csv(
-    RECIPES_FILE
-)
+workspaces_lock = threading.Lock()
 
-# Ingredient -> menu items that use it, for surfacing "push these dishes"
-# suggestions on the waste control page.
-ingredient_dishes = (
-    recipes
-    .groupby("ingredient")["item"]
-    .apply(lambda s: sorted(set(s)))
-    .to_dict()
-)
 
-if os.path.exists(POS_LOG_FILE):
+def workspace_for(user):
 
-    pos_log = pd.read_csv(POS_LOG_FILE)
+    if user["workspace"] == DEMO_WORKSPACE:
+        return workspaces[DEMO_WORKSPACE]
 
-else:
+    key = hashlib.sha256(user["email"].encode()).hexdigest()[:16]
 
-    pos_log = pd.DataFrame(columns=POS_LOG_COLUMNS)
-    pos_log.to_csv(POS_LOG_FILE, index=False)
+    with workspaces_lock:
 
-settings = load_settings(SETTINGS_FILE)
+        if key not in workspaces:
+            workspaces[key] = Workspace(
+                os.path.join(WORKSPACES_DIR, key),
+                restaurant_name=user["restaurant_name"]
+            )
+
+        return workspaces[key]
 
 
 # =========================================================
-# FORECAST
+# AUTH
 # =========================================================
 
-# Forecasting/backtesting run only over clean, fully-logged trading
-# days — see trim_sparse_trailing_days(). `sales` itself stays the
-# full history (including any live POS-appended rows) for everything
-# else (dashboard sales period, sales log, etc).
-history_sales = trim_sparse_trailing_days(sales)
+def current_user(authorization: str | None = Header(default=None)):
 
-forecast = forecast_all_items(
-    history_sales,
-    days=7
-)
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not signed in")
 
+    user = users.user_for_token(authorization.removeprefix("Bearer "))
 
-# =========================================================
-# INVENTORY ANALYSIS
-# =========================================================
+    if user is None:
+        raise HTTPException(status_code=401, detail="Session expired, please sign in again")
 
-def build_inventory_status():
-
-    return calculate_inventory_status(
-        inventory,
-        forecast,
-        recipes,
-        lead_time_days=settings["lead_time_days"],
-        safety_stock_days=settings["safety_stock_days"],
-        critical_days=settings["critical_days"],
-        low_days=settings["low_days"],
-        normal_days=settings["normal_days"]
-    )
+    return user
 
 
-inventory_status = build_inventory_status()
+def current_workspace(user: dict = Depends(current_user)):
+
+    return workspace_for(user)
 
 
-# =========================================================
-# WASTE ANALYSIS
-# =========================================================
-
-waste_analysis = (
-    calculate_waste(
-        inventory_status,
-        forecast
-    )
-)
+class SignupRequest(BaseModel):
+    name: str
+    restaurant_name: str
+    email: str
+    password: str
 
 
-# =========================================================
-# MODEL ACCURACY (BACKTEST)
-# =========================================================
-
-model_accuracy = backtest_accuracy(
-    history_sales,
-    holdout_days=13
-)
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 
-# =========================================================
-# POS MENU
-# =========================================================
+@app.post("/api/auth/signup")
+def signup(request: SignupRequest):
 
-menu = build_menu(sales)
+    if not request.name.strip() or not request.restaurant_name.strip():
+        raise HTTPException(status_code=400, detail="Name and restaurant name are required")
+
+    if "@" not in request.email or "." not in request.email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="Enter a valid email address")
+
+    if len(request.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    try:
+        user = users.create(
+            request.name,
+            request.restaurant_name,
+            request.email,
+            request.password
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+    return {
+        "token": users.issue_token(user),
+        "user": public_user(user)
+    }
 
 
-# =========================================================
-# POS SALE LOCK
-# =========================================================
+@app.post("/api/auth/login")
+def login(request: LoginRequest):
 
-sale_lock = threading.Lock()
+    user = users.authenticate(request.email, request.password)
+
+    if user is None:
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+
+    return {
+        "token": users.issue_token(user),
+        "user": public_user(user)
+    }
+
+
+@app.get("/api/auth/me")
+def me(user: dict = Depends(current_user)):
+
+    return public_user(user)
 
 
 # =========================================================
@@ -244,23 +216,9 @@ def root():
 # =========================================================
 
 @app.get("/api/forecast")
-def get_forecast():
+def get_forecast(ws: Workspace = Depends(current_workspace)):
 
-    data = forecast.copy()
-
-    return {
-
-        "forecast_days": 7,
-
-        "last_historical_date":
-            sales["Date"].max()
-            .strftime("%Y-%m-%d"),
-
-        "forecast": data.to_dict(
-            orient="records"
-        )
-
-    }
+    return ws.forecast_view()
 
 
 # =========================================================
@@ -269,14 +227,11 @@ def get_forecast():
 
 @app.get("/api/forecast/{item_name}")
 def get_item_forecast(
-    item_name: str
+    item_name: str,
+    ws: Workspace = Depends(current_workspace)
 ):
 
-    result = forecast[
-        forecast["item"].str.lower()
-        ==
-        item_name.lower()
-    ]
+    result = ws.item_forecast(item_name)
 
     if result.empty:
 
@@ -298,71 +253,21 @@ def get_item_forecast(
 # =========================================================
 
 @app.get("/api/inventory")
-def get_inventory():
+def get_inventory(ws: Workspace = Depends(current_workspace)):
 
-    # waste_analysis is inventory_status plus the waste-risk columns
-    # (Waste_Risk, Expected_Excess, Waste_Reduction_Suggestion), so
-    # returning it gives the Inventory tab reorder status and waste
-    # flags in one call.
-    return {
+    return ws.inventory_view()
 
-        "inventory":
-            waste_analysis.to_dict(
-                orient="records"
-            )
-
-    }
-
-
-# =========================================================
-# CRITICAL INVENTORY
-# =========================================================
 
 @app.get("/api/inventory/critical")
-def get_critical_inventory():
+def get_critical_inventory(ws: Workspace = Depends(current_workspace)):
 
-    critical = inventory_status[
-        inventory_status["Status"]
-        == "CRITICAL"
-    ]
+    return ws.inventory_with_status(["CRITICAL"])
 
-    return {
-
-        "count":
-            len(critical),
-
-        "items":
-            critical.to_dict(
-                orient="records"
-            )
-
-    }
-
-
-# =========================================================
-# LOW INVENTORY
-# =========================================================
 
 @app.get("/api/inventory/low")
-def get_low_inventory():
+def get_low_inventory(ws: Workspace = Depends(current_workspace)):
 
-    low = inventory_status[
-        inventory_status["Status"].isin(
-            ["CRITICAL", "LOW"]
-        )
-    ]
-
-    return {
-
-        "count":
-            len(low),
-
-        "items":
-            low.to_dict(
-                orient="records"
-            )
-
-    }
+    return ws.inventory_with_status(["CRITICAL", "LOW"])
 
 
 # =========================================================
@@ -370,31 +275,9 @@ def get_low_inventory():
 # =========================================================
 
 @app.get("/api/orders")
-def get_order_recommendations():
+def get_order_recommendations(ws: Workspace = Depends(current_workspace)):
 
-    orders = inventory_status[
-        inventory_status["Status"].isin(["CRITICAL", "LOW"])
-        | (inventory_status["Suggested_Order"] > 0)
-    ].copy()
-
-    return {
-
-        "orders":
-            orders[
-                [
-                    "Ingredient",
-                    "Unit",
-                    "Current_Inventory",
-                    "Forecast_7_Day_Demand",
-                    "Days_of_Stock",
-                    "Status",
-                    "Suggested_Order"
-                ]
-            ].to_dict(
-                orient="records"
-            )
-
-    }
+    return ws.orders_view()
 
 
 # =========================================================
@@ -402,39 +285,9 @@ def get_order_recommendations():
 # =========================================================
 
 @app.get("/api/waste")
-def get_waste():
+def get_waste(ws: Workspace = Depends(current_workspace)):
 
-    waste = waste_analysis[
-        waste_analysis["Waste_Risk"]
-        != "LOW"
-    ].copy()
-
-    waste["Used_In"] = waste["Ingredient"].map(
-        lambda name: ingredient_dishes.get(name, [])
-    )
-
-    return {
-
-        "count":
-            len(waste),
-
-        "waste_risk":
-            waste[
-                [
-                    "Ingredient",
-                    "Unit",
-                    "Current_Inventory",
-                    "Expected_7_Day_Usage",
-                    "Expected_Excess",
-                    "Waste_Risk",
-                    "Waste_Reduction_Suggestion",
-                    "Used_In"
-                ]
-            ].to_dict(
-                orient="records"
-            )
-
-    }
+    return ws.waste_view()
 
 
 # =========================================================
@@ -442,110 +295,9 @@ def get_waste():
 # =========================================================
 
 @app.get("/api/dashboard")
-def get_dashboard():
+def get_dashboard(ws: Workspace = Depends(current_workspace)):
 
-    critical = inventory_status[
-        inventory_status["Status"]
-        == "CRITICAL"
-    ]
-
-    low = inventory_status[
-        inventory_status["Status"]
-        == "LOW"
-    ]
-
-    orders = inventory_status[
-        inventory_status["Status"].isin(["CRITICAL", "LOW"])
-        | (inventory_status["Suggested_Order"] > 0)
-    ]
-
-    waste = waste_analysis[
-        waste_analysis["Waste_Risk"]
-        != "LOW"
-    ]
-
-    return {
-
-        "sales_period": {
-
-            "start":
-                sales["Date"]
-                .min()
-                .strftime("%Y-%m-%d"),
-
-            "end":
-                sales["Date"]
-                .max()
-                .strftime("%Y-%m-%d")
-        },
-
-        "forecast": {
-
-            "days": 7,
-
-            "total_expected_units":
-                round(
-                    forecast[
-                        "forecast_quantity"
-                    ].sum(),
-                    2
-                )
-        },
-
-        "inventory": {
-
-            "total_ingredients":
-                len(inventory_status),
-
-            "critical":
-                len(critical),
-
-            "low":
-                len(low),
-
-            "orders_required":
-                len(orders),
-
-            "waste_risk_items":
-                len(waste)
-        },
-
-        "model_accuracy":
-            model_accuracy["overall"],
-
-        "critical_items":
-            critical[
-                [
-                    "Ingredient",
-                    "Current_Inventory",
-                    "Days_of_Stock"
-                ]
-            ].to_dict(
-                orient="records"
-            ),
-
-        "orders":
-            orders[
-                [
-                    "Ingredient",
-                    "Unit",
-                    "Suggested_Order"
-                ]
-            ].to_dict(
-                orient="records"
-            ),
-
-        "waste":
-            waste[
-                [
-                    "Ingredient",
-                    "Expected_Excess",
-                    "Waste_Risk"
-                ]
-            ].to_dict(
-                orient="records"
-            )
-    }
+    return ws.dashboard()
 
 
 # =========================================================
@@ -553,9 +305,9 @@ def get_dashboard():
 # =========================================================
 
 @app.get("/api/accuracy")
-def get_accuracy():
+def get_accuracy(ws: Workspace = Depends(current_workspace)):
 
-    return model_accuracy
+    return ws.model_accuracy
 
 
 # =========================================================
@@ -563,10 +315,10 @@ def get_accuracy():
 # =========================================================
 
 @app.get("/api/menu")
-def get_menu():
+def get_menu(ws: Workspace = Depends(current_workspace)):
 
     return {
-        "menu": menu
+        "menu": ws.menu
     }
 
 
@@ -586,10 +338,9 @@ class SaleRequest(BaseModel):
 
 @app.post("/api/pos/sale")
 def post_sale(
-    request: SaleRequest
+    request: SaleRequest,
+    ws: Workspace = Depends(current_workspace)
 ):
-
-    global inventory, sales, inventory_status, waste_analysis, pos_log
 
     cart = [line.model_dump() for line in request.cart]
 
@@ -600,219 +351,12 @@ def post_sale(
         )
 
     try:
-
-        consumption = compute_consumption(
-            cart,
-            recipes
-        )
-
+        return ws.record_sale(cart)
     except ValueError as exc:
-
         raise HTTPException(
             status_code=400,
             detail=str(exc)
         )
-
-    menu_lookup = {
-        (m["item"], s["size"]): s["price"]
-        for m in menu
-        for s in m["sizes"]
-    }
-
-    for line in cart:
-        key = (line["item"], line["size"])
-        if key not in menu_lookup:
-            raise HTTPException(
-                status_code=400,
-                detail=f"{line['item']} ({line['size']}) is not on the menu"
-            )
-
-    with sale_lock:
-
-        # ---------------------------------------------
-        # Deduct consumption from inventory
-        # ---------------------------------------------
-
-        updated_inventory = inventory.copy()
-        shortfalls = []
-        consumed = []
-
-        for _, row in consumption.iterrows():
-
-            mask = (
-                (updated_inventory["Ingredient"] == row["ingredient"])
-                &
-                (updated_inventory["Unit"] == row["unit"])
-            )
-
-            if not mask.any():
-                continue
-
-            idx = updated_inventory[mask].index[0]
-
-            current = float(updated_inventory.loc[idx, "Current_Inventory"])
-            new_value = current - float(row["required"])
-
-            consumed.append({
-                "ingredient": row["ingredient"],
-                "unit": row["unit"],
-                "consumed": round(float(row["required"]), 2),
-                "remaining": round(max(new_value, 0), 2)
-            })
-
-            if new_value < 0:
-                shortfalls.append({
-                    "ingredient": row["ingredient"],
-                    "unit": row["unit"],
-                    "short_by": round(abs(new_value), 2)
-                })
-
-            updated_inventory.loc[idx, "Current_Inventory"] = max(new_value, 0)
-
-        # ---------------------------------------------
-        # Append sale rows to sales history
-        # ---------------------------------------------
-
-        today = date.today()
-
-        new_rows = []
-
-        for line in cart:
-
-            price = menu_lookup[(line["item"], line["size"])]
-            quantity = line["quantity"]
-
-            new_rows.append({
-                "Date": pd.Timestamp(today),
-                "Item": line["item"],
-                "Size": line["size"],
-                "Quantity_Sold": quantity,
-                "Unit_Price": price,
-                "Total_Sales": price * quantity,
-                "Day": today.strftime("%A"),
-                "Month": today.strftime("%Y-%m")
-            })
-
-        new_sales_rows = pd.DataFrame(new_rows)[RAW_SALES_COLUMNS]
-
-        # ---------------------------------------------
-        # Record the order in the POS sales log
-        # (kept separate from the raw sales history —
-        # this is what the Sales Log tab reads from)
-        # ---------------------------------------------
-
-        order_id = uuid.uuid4().hex[:10]
-        timestamp = datetime.now().isoformat(timespec="seconds")
-
-        order_items = []
-        log_rows = []
-
-        for line in cart:
-
-            price = menu_lookup[(line["item"], line["size"])]
-            quantity = line["quantity"]
-            line_total = round(price * quantity, 2)
-
-            order_items.append({
-                "item": line["item"],
-                "size": line["size"],
-                "quantity": quantity,
-                "price": price,
-                "line_total": line_total
-            })
-
-            log_rows.append({
-                "OrderId": order_id,
-                "Timestamp": timestamp,
-                "Item": line["item"],
-                "Size": line["size"],
-                "Quantity": quantity,
-                "Unit_Price": price,
-                "Line_Total": line_total
-            })
-
-        order = {
-            "order_id": order_id,
-            "timestamp": timestamp,
-            "items": order_items,
-            "total": round(sum(i["line_total"] for i in order_items), 2)
-        }
-
-        new_log_rows = pd.DataFrame(log_rows)[POS_LOG_COLUMNS]
-
-        new_log_rows.to_csv(
-            POS_LOG_FILE,
-            mode="a",
-            header=False,
-            index=False
-        )
-
-        pos_log = pd.concat(
-            [pos_log, new_log_rows],
-            ignore_index=True
-        )
-
-        # ---------------------------------------------
-        # Persist to disk (raw schema only — no derived
-        # Scale / Equivalent_Sales columns)
-        # ---------------------------------------------
-
-        updated_inventory.to_csv(
-            INVENTORY_FILE,
-            index=False
-        )
-
-        persisted_new_rows = new_sales_rows.copy()
-        persisted_new_rows["Date"] = persisted_new_rows["Date"].dt.strftime("%Y-%m-%d")
-        persisted_new_rows.to_csv(
-            SALES_FILE,
-            mode="a",
-            header=False,
-            index=False
-        )
-
-        # ---------------------------------------------
-        # Recompute derived state
-        # ---------------------------------------------
-
-        new_sales_rows["Scale"] = (
-            new_sales_rows["Size"].map(SIZE_MULTIPLIER).fillna(1.0)
-        )
-        new_sales_rows["Equivalent_Sales"] = (
-            new_sales_rows["Quantity_Sold"] * new_sales_rows["Scale"]
-        )
-
-        inventory = updated_inventory
-        sales = pd.concat(
-            [sales, new_sales_rows],
-            ignore_index=True
-        )
-
-        inventory_status = build_inventory_status()
-
-        waste_analysis = calculate_waste(
-            inventory_status,
-            forecast
-        )
-
-        touched = [c["ingredient"] for c in consumed]
-
-        updated_rows = inventory_status[
-            inventory_status["Ingredient"].isin(touched)
-        ].to_dict(orient="records")
-
-    return {
-
-        "ok": True,
-
-        "order": order,
-
-        "consumed": consumed,
-
-        "shortfalls": shortfalls,
-
-        "inventory": updated_rows
-    }
 
 
 # =========================================================
@@ -820,60 +364,63 @@ def post_sale(
 # =========================================================
 
 @app.get("/api/sales/log")
-def get_sales_log(limit: int = 100):
+def get_sales_log(limit: int = 100, ws: Workspace = Depends(current_workspace)):
 
-    if pos_log.empty:
+    return ws.sales_log(limit)
 
-        return {
-            "orders": [],
-            "today_total": 0,
-            "today_orders": 0
-        }
 
-    grouped = []
+# =========================================================
+# DATA UPLOADS
+# =========================================================
 
-    for order_id, group in pos_log.groupby("OrderId", sort=False):
-
-        timestamp = group["Timestamp"].iloc[0]
-
-        items = [
-            {
-                "item": row["Item"],
-                "size": row["Size"],
-                "quantity": float(row["Quantity"]),
-                "price": float(row["Unit_Price"]),
-                "line_total": float(row["Line_Total"])
-            }
-            for _, row in group.iterrows()
-        ]
-
-        grouped.append({
-            "order_id": order_id,
-            "timestamp": timestamp,
-            "items": items,
-            "item_count": len(items),
-            "total": round(float(group["Line_Total"].sum()), 2)
-        })
-
-    grouped.sort(key=lambda o: o["timestamp"], reverse=True)
-
-    today_str = date.today().isoformat()
-
-    today_orders = [
-        o for o in grouped
-        if o["timestamp"].startswith(today_str)
-    ]
+@app.get("/api/data/status")
+def get_data_status(ws: Workspace = Depends(current_workspace)):
 
     return {
-
-        "orders": grouped[:limit],
-
-        "today_total": round(
-            sum(o["total"] for o in today_orders), 2
-        ),
-
-        "today_orders": len(today_orders)
+        kind: {
+            "label": spec["label"],
+            "uploaded": ws.has(kind),
+            "required_columns": spec["required"],
+            "columns": spec["columns"]
+        }
+        for kind, spec in UPLOADS.items()
     }
+
+
+@app.get("/api/data/template/{kind}")
+def get_template(kind: str):
+
+    if kind not in UPLOADS:
+        raise HTTPException(status_code=404, detail="Unknown dataset")
+
+    return Response(
+        content=template_csv(kind),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{kind}_template.csv"'}
+    )
+
+
+@app.post("/api/data/upload/{kind}")
+async def upload_data(
+    kind: str,
+    mode: str = "replace",
+    file: UploadFile = File(...),
+    ws: Workspace = Depends(current_workspace)
+):
+
+    if kind not in UPLOADS:
+        raise HTTPException(status_code=404, detail="Unknown dataset")
+
+    if mode not in ("replace", "append"):
+        raise HTTPException(status_code=400, detail="mode must be replace or append")
+
+    try:
+        df = normalise_upload(kind, read_upload(file.filename, await file.read()))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not read {file.filename}: {exc}")
+
+    # Re-fitting the forecast takes a few seconds; keep it off the event loop
+    return await run_in_threadpool(ws.upload, kind, df, mode)
 
 
 # =========================================================
@@ -891,46 +438,20 @@ class SettingsUpdate(BaseModel):
 
 
 @app.get("/api/settings")
-def get_settings():
+def get_settings(ws: Workspace = Depends(current_workspace)):
 
-    return settings
+    return ws.settings
 
 
 @app.put("/api/settings")
-def update_settings(update: SettingsUpdate):
-
-    global settings, inventory_status, waste_analysis
+def update_settings(update: SettingsUpdate, ws: Workspace = Depends(current_workspace)):
 
     updates = {
         k: v for k, v in update.model_dump().items()
         if v is not None
     }
 
-    merged = {**settings, **updates}
-
-    if not (
-        merged["critical_days"]
-        < merged["low_days"]
-        < merged["normal_days"]
-    ):
-
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Thresholds must increase: "
-                "critical_days < low_days < normal_days"
-            )
-        )
-
-    settings = merged
-
-    save_settings(SETTINGS_FILE, settings)
-
-    inventory_status = build_inventory_status()
-
-    waste_analysis = calculate_waste(
-        inventory_status,
-        forecast
-    )
-
-    return settings
+    try:
+        return ws.update_settings(updates)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))

@@ -72,12 +72,12 @@ def calculate_inventory_status(
             })
 
     demand_df = pd.DataFrame(
-        forecast_demand
+        forecast_demand,
+        columns=["ingredient", "unit", "required"]
     )
 
-    if demand_df.empty:
-        return inventory
-
+    # No forecast yet (e.g. no sales uploaded): every ingredient
+    # simply gets zero forecast demand below.
     demand_df = (
         demand_df
         .groupby(

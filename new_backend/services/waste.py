@@ -103,6 +103,49 @@ def generate_suggestion(
 
 
 # ---------------------------------------------------------
+# DISPOSAL ROUTE: GARDENING (COMPOST) OR DONATION
+# ---------------------------------------------------------
+
+# Raw plant produce: peels, trimmings and spoiled excess can be
+# composted and used as garden manure.
+COMPOSTABLE_KEYWORDS = [
+    "potato", "onion", "tomato", "cabbage", "capsicum",
+    "carrot", "corn", "mushroom", "garlic", "herb"
+]
+
+
+def classify_disposal(
+    ingredient
+):
+
+    name = ingredient.lower()
+
+    # Sauces and processed items contain salt/oil, so they are
+    # not compostable even when a produce word appears in the name.
+    if "sauce" in name:
+
+        return (
+            "DONATE",
+            "Donate unopened, within-date packs to a food bank "
+            "or community kitchen."
+        )
+
+    if any(word in name for word in COMPOSTABLE_KEYWORDS):
+
+        return (
+            "GARDENING",
+            "Compost peels, trimmings and spoiled excess "
+            "for use as garden manure."
+        )
+
+    return (
+        "DONATE",
+        "Donate safe, unspoiled excess to a food bank or "
+        "NGO before expiry. Do not compost (dairy/cooked/processed)."
+    )
+
+
+# ---------------------------------------------------------
 # PREDICTED WASTE
 # ---------------------------------------------------------
 
@@ -174,5 +217,15 @@ def calculate_waste(
         result["Ingredient"]
         .apply(generate_suggestion)
     )
+
+    # -----------------------------------------------------
+    # Gardening / donation tag
+    # -----------------------------------------------------
+
+    disposal = result["Ingredient"].apply(classify_disposal)
+
+    result["Disposal_Route"] = disposal.str[0]
+
+    result["Disposal_Note"] = disposal.str[1]
 
     return result

@@ -16,7 +16,17 @@ env/
 .idea/
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Backup files created during data edits
 *.bak
 *.bak2
+*.bak3
+
+# Auth data (password hashes, token signing secret)
+new_backend/data/users.json
+new_backend/data/.auth_secret
+
+# Per-account uploaded data and upload backups
+new_backend/data/workspaces/
+*.upload-backup

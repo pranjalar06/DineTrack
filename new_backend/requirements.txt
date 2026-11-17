@@ -5,3 +5,4 @@ numpy
 statsmodels
 pydantic
 python-multipart
+openpyxl
